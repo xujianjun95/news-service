@@ -17,12 +17,12 @@ async function fetchSummary(url) {
   }
 }
 
-async function fetchNews() {
+async function fetch36kr() {
   try {
     const feed = await parser.parseURL(`${RSSHUB_BASE}/36kr/information/AI`);
     const items = feed.items.slice(0, 10);
 
-    const results = await Promise.all(
+    return await Promise.all(
       items.map(async (item) => {
         const summary = await fetchSummary(item.link);
         return {
@@ -35,12 +35,40 @@ async function fetchNews() {
         };
       })
     );
-
-    return results;
   } catch (err) {
     console.error('[fetcher] 36kr AI 抓取失败:', err.message);
     return [];
   }
+}
+
+async function fetchAIBase() {
+  try {
+    const feed = await parser.parseURL(`${RSSHUB_BASE}/aibase/daily`);
+    const items = feed.items.slice(0, 10);
+
+    return items.map((item) => ({
+      title: (item.title || '').replace(/^AI日报[：:]\s*/, ''),
+      summary: (item.contentSnippet || '').slice(0, 80),
+      source: 'AIBase',
+      category: 'AI',
+      publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
+      url: item.link || '',
+    }));
+  } catch (err) {
+    console.error('[fetcher] AIBase 抓取失败:', err.message);
+    return [];
+  }
+}
+
+async function fetchNews() {
+  const [news36kr, newsAIBase] = await Promise.all([
+    fetch36kr(),
+    fetchAIBase(),
+  ]);
+
+  return [...news36kr, ...newsAIBase]
+    .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
+    .slice(0, 15);
 }
 
 module.exports = { fetchNews };
