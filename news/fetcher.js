@@ -40,7 +40,7 @@ async function generateSummary(title) {
         max_tokens: 50,
         temperature: 0.3,
       }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(15000),
     });
 
     const data = await res.json();
@@ -134,7 +134,7 @@ async function translateToChinese(text) {
         max_tokens: 100,
         temperature: 0.3,
       }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(15000),
     });
 
     const data = await res.json();
@@ -151,7 +151,8 @@ async function fetchHackerNews() {
 
     return await Promise.all(
       aiItems.map(async (item) => {
-        const title = await translateToChinese(item.title || '');
+        const originalTitle = item.title || '';
+        const title = await translateToChinese(originalTitle);
         const summary = await generateSummary(title);
         return {
           title,
