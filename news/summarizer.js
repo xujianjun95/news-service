@@ -31,12 +31,16 @@ async function summarize(url, title) {
 
   if (!apiKey) throw new Error('DEEPSEEK_API_KEY not configured');
 
-  const articleText = await fetchArticleText(url);
+  let articleText = '';
+  try {
+    articleText = await fetchArticleText(url);
+  } catch {
+    // Hacker News 等讨论页无法抓取正文，用标题生成摘要
+  }
 
-  const prompt = `你是一个资讯摘要助手。请根据以下文章内容，用中文写一篇 200-300 字的摘要，概括文章核心要点。要求分段输出，每段讲一个要点，段与段之间用换行符分隔。不要加标题，直接输出摘要正文。
-
-文章标题：${title}
-文章内容：${articleText}`;
+  const prompt = articleText
+    ? `你是一个资讯摘要助手。请根据以下文章内容，用中文写一篇 200-300 字的摘要，概括文章核心要点。要求分段输出，每段讲一个要点，段与段之间用换行符分隔。不要加标题，直接输出摘要正文。\n\n文章标题：${title}\n文章内容：${articleText}`
+    : `你是一个资讯摘要助手。请根据以下标题，用中文写一篇 100-150 字的摘要，推测文章核心要点。要求分段输出，段与段之间用换行符分隔。不要加标题，直接输出摘要正文。\n\n标题：${title}`;
 
   const res = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: 'POST',
