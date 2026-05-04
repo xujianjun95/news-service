@@ -57,7 +57,10 @@ async function fetch36kr() {
 
     return await Promise.all(
       items.map(async (item) => {
-        const summary = await fetchSummary(item.link);
+        let summary = await fetchSummary(item.link);
+        if (!summary || summary.length < 10) {
+          summary = await generateSummary(item.title);
+        }
         return {
           title: item.title || '',
           summary: summary || (item.contentSnippet || '').slice(0, 50),
