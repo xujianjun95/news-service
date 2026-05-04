@@ -3,7 +3,7 @@ const { fetchNews } = require('./fetcher');
 let cachedNews = null;
 let lastUpdated = null;
 
-const UPDATE_INTERVAL = 30 * 60 * 1000; // 30 分钟
+const UPDATE_INTERVAL = 2 * 60 * 60 * 1000; // 2 小时
 
 function isQuietHours() {
   const hour = new Date().getHours();
