@@ -16,7 +16,7 @@ function extractText(html) {
 async function fetchArticleText(url) {
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(30000),
   });
   const html = await res.text();
   return extractText(html);
@@ -33,7 +33,7 @@ async function summarize(url, title) {
 
   const articleText = await fetchArticleText(url);
 
-  const prompt = `你是一个资讯摘要助手。请根据以下文章内容，用中文写一段 200-300 字的摘要，概括文章核心要点。不要加标题，直接输出摘要正文。
+  const prompt = `你是一个资讯摘要助手。请根据以下文章内容，用中文写一篇 200-300 字的摘要，概括文章核心要点。要求分段输出，每段讲一个要点，段与段之间用换行符分隔。不要加标题，直接输出摘要正文。
 
 文章标题：${title}
 文章内容：${articleText}`;
@@ -50,7 +50,7 @@ async function summarize(url, title) {
       max_tokens: 500,
       temperature: 0.3,
     }),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(60000),
   });
 
   if (!res.ok) {
