@@ -40,7 +40,7 @@ async function generateSummary(title) {
         max_tokens: 50,
         temperature: 0.3,
       }),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(60000),
     });
 
     const data = await res.json();
@@ -134,7 +134,7 @@ async function translateToChinese(text) {
         max_tokens: 100,
         temperature: 0.3,
       }),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(60000),
     });
 
     const data = await res.json();
