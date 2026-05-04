@@ -105,6 +105,70 @@ async function fetchAIBase() {
   }
 }
 
+const AI_KEYWORDS = /\b(ai|artificial.intelligence|llm|gpt|openai|anthropic|claude|gemini|deepseek|machine.learning|deep.learning|neural|transformer|diffusion|stable.diffusion|midjourney|copilot|chatbot|model|推理|大模型|人工智能)\b/i;
+
+function isAIRelated(title) {
+  return AI_KEYWORDS.test(title);
+}
+
+async function translateToChinese(text) {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const baseUrl = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
+  const model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+
+  if (!apiKey) return text;
+
+  try {
+    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{
+          role: 'user',
+          content: `将以下英文翻译成中文，直接输出翻译结果：${text}`,
+        }],
+        max_tokens: 100,
+        temperature: 0.3,
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content?.trim() || text;
+  } catch {
+    return text;
+  }
+}
+
+async function fetchHackerNews() {
+  try {
+    const feed = await parser.parseURL(`${RSSHUB_BASE}/hackernews`);
+    const aiItems = feed.items.filter((item) => isAIRelated(item.title)).slice(0, 5);
+
+    return await Promise.all(
+      aiItems.map(async (item) => {
+        const title = await translateToChinese(item.title || '');
+        const summary = await generateSummary(title);
+        return {
+          title,
+          summary: summary || (item.contentSnippet || '').slice(0, 50),
+          source: 'Hacker News',
+          category: 'AI',
+          publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
+          url: item.link || '',
+        };
+      })
+    );
+  } catch (err) {
+    console.error('[fetcher] Hacker News 抓取失败:', err.message);
+    return [];
+  }
+}
+
 function dedup(items) {
   const seen = new Set();
   return items.filter((item) => {
@@ -116,12 +180,13 @@ function dedup(items) {
 }
 
 async function fetchNews() {
-  const [news36kr, newsAIBase] = await Promise.all([
+  const [news36kr, newsAIBase, newsHN] = await Promise.all([
     fetch36kr(),
     fetchAIBase(),
+    fetchHackerNews(),
   ]);
 
-  return dedup([...news36kr, ...newsAIBase])
+  return dedup([...news36kr, ...newsAIBase, ...newsHN])
     .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
     .slice(0, 10);
 }
