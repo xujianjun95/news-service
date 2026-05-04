@@ -17,6 +17,39 @@ async function fetchSummary(url) {
   }
 }
 
+async function generateSummary(title) {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const baseUrl = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
+  const model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+
+  if (!apiKey) return '';
+
+  try {
+    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{
+          role: 'user',
+          content: `用中文写一句话摘要，不超过30字，直接输出摘要：${title}`,
+        }],
+        max_tokens: 50,
+        temperature: 0.3,
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content?.trim() || '';
+  } catch {
+    return '';
+  }
+}
+
 async function fetch36kr() {
   try {
     const feed = await parser.parseURL(`${RSSHUB_BASE}/36kr/information/AI`);
@@ -46,14 +79,23 @@ async function fetchAIBase() {
     const feed = await parser.parseURL(`${RSSHUB_BASE}/aibase/daily`);
     const items = feed.items.slice(0, 10);
 
-    return items.map((item) => ({
-      title: (item.title || '').replace(/^AI日报[：:]\s*/, ''),
-      summary: (item.contentSnippet || '').slice(0, 80),
-      source: 'AIBase',
-      category: 'AI',
-      publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
-      url: item.link || '',
-    }));
+    return await Promise.all(
+      items.map(async (item) => {
+        const title = (item.title || '').replace(/^AI日报[：:]\s*/, '');
+        let summary = (item.contentSnippet || '').slice(0, 80);
+        if (!summary || summary.length < 10) {
+          summary = await generateSummary(title);
+        }
+        return {
+          title,
+          summary,
+          source: 'AIBase',
+          category: 'AI',
+          publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
+          url: item.link || '',
+        };
+      })
+    );
   } catch (err) {
     console.error('[fetcher] AIBase 抓取失败:', err.message);
     return [];
