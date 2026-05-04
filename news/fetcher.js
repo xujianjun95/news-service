@@ -60,15 +60,25 @@ async function fetchAIBase() {
   }
 }
 
+function dedup(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = item.title.trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 async function fetchNews() {
   const [news36kr, newsAIBase] = await Promise.all([
     fetch36kr(),
     fetchAIBase(),
   ]);
 
-  return [...news36kr, ...newsAIBase]
+  return dedup([...news36kr, ...newsAIBase])
     .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
-    .slice(0, 15);
+    .slice(0, 10);
 }
 
 module.exports = { fetchNews };

@@ -3,9 +3,19 @@ const { fetchNews } = require('./fetcher');
 let cachedNews = null;
 let lastUpdated = null;
 
-const UPDATE_INTERVAL = 20 * 60 * 1000; // 20 分钟
+const UPDATE_INTERVAL = 30 * 60 * 1000; // 30 分钟
+
+function isQuietHours() {
+  const hour = new Date().getHours();
+  return hour >= 0 && hour < 8;
+}
 
 async function refreshNews() {
+  if (isQuietHours()) {
+    console.log('[news] 静默时段（0:00-8:00），跳过更新');
+    return;
+  }
+
   console.log('[news] 开始刷新资讯...');
   try {
     const items = await fetchNews();
