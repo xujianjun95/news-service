@@ -1,5 +1,4 @@
-const { fetchAllSources } = require('./fetcher');
-const { filterAndSummarize } = require('./filter');
+const { fetchNews } = require('./fetcher');
 
 let cachedNews = null;
 let lastUpdated = null;
@@ -9,13 +8,10 @@ const UPDATE_INTERVAL = 20 * 60 * 1000; // 20 分钟
 async function refreshNews() {
   console.log('[news] 开始刷新资讯...');
   try {
-    const rawItems = await fetchAllSources();
-    console.log(`[news] 抓取到 ${rawItems.length} 条原始资讯`);
+    const items = await fetchNews();
+    console.log(`[news] 获取到 ${items.length} 条资讯`);
 
-    const filtered = await filterAndSummarize(rawItems);
-    console.log(`[news] AI 筛选后 ${filtered.length} 条`);
-
-    cachedNews = filtered;
+    cachedNews = items;
     lastUpdated = new Date().toISOString();
     console.log('[news] 资讯刷新完成');
   } catch (err) {
