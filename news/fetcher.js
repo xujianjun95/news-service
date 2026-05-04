@@ -170,6 +170,33 @@ async function fetchHackerNews() {
   }
 }
 
+async function fetchSspai() {
+  try {
+    const feed = await parser.parseURL(`${RSSHUB_BASE}/sspai/tag/AI`);
+    const items = feed.items.slice(0, 5);
+
+    return await Promise.all(
+      items.map(async (item) => {
+        let summary = (item.contentSnippet || '').slice(0, 80);
+        if (!summary || summary.length < 10) {
+          summary = await generateSummary(item.title);
+        }
+        return {
+          title: item.title || '',
+          summary,
+          source: '少数派',
+          category: 'AI',
+          publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
+          url: item.link || '',
+        };
+      })
+    );
+  } catch (err) {
+    console.error('[fetcher] 少数派 抓取失败:', err.message);
+    return [];
+  }
+}
+
 function dedup(items) {
   const seen = new Set();
   return items.filter((item) => {
@@ -181,13 +208,14 @@ function dedup(items) {
 }
 
 async function fetchNews() {
-  const [news36kr, newsAIBase, newsHN] = await Promise.all([
+  const [news36kr, newsAIBase, newsHN, newsSspai] = await Promise.all([
     fetch36kr(),
     fetchAIBase(),
     fetchHackerNews(),
+    fetchSspai(),
   ]);
 
-  return dedup([...news36kr, ...newsAIBase, ...newsHN])
+  return dedup([...news36kr, ...newsAIBase, ...newsHN, ...newsSspai])
     .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
     .slice(0, 10);
 }
