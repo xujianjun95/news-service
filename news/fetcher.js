@@ -114,7 +114,20 @@ function normalizeAIHotItem(item) {
 
 async function fetchAIHotFeatured() {
   try {
-    const feed = await parser.parseURL(AIHOT_FEATURED_FEED_URL);
+    const res = await fetch(AIHOT_FEATURED_FEED_URL, {
+      headers: {
+        'User-Agent': 'PMTOOLS news-service/1.0 (+https://pmtools.com.cn)',
+        'Accept': 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const xml = await res.text();
+    const feed = await parser.parseString(xml);
     return feed.items.slice(0, 20).map(normalizeAIHotItem);
   } catch (err) {
     console.error('[fetcher] AI HOT 精选抓取失败:', err.message);
