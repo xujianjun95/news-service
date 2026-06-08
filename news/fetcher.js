@@ -15,6 +15,11 @@ function cleanText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
 
+function toPreviewSummary(value, maxLength = 90) {
+  const summary = cleanText(value);
+  return summary.length > maxLength ? `${summary.slice(0, maxLength)}…` : summary;
+}
+
 async function fetchSummary(url) {
   try {
     const res = await fetch(url, {
@@ -98,7 +103,7 @@ function normalizeAIHotSource(author) {
 
 function normalizeAIHotItem(item) {
   const title = cleanText(item.title);
-  const summary = cleanText(item.contentSnippet || item.content || item.description);
+  const summary = toPreviewSummary(item.contentSnippet || item.content || item.description);
   const url = item.link || item.guid || '';
 
   return {
