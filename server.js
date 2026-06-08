@@ -5,7 +5,7 @@ const { getCachedNews, startAutoRefresh } = require('./news/cache');
 const { summarize } = require('./news/summarizer');
 
 const app = express();
-const port = Number(process.env.PORT) || 3001;
+const port = Number(process.env.PORT) || 3002;
 
 app.use(cors());
 app.use(express.json());
