@@ -1,7 +1,19 @@
 const Parser = require('rss-parser');
-const parser = new Parser({ timeout: 10000 });
 
 const RSSHUB_BASE = process.env.RSSHUB_URL || 'http://localhost:1200';
+const AIHOT_FEATURED_FEED_URL = process.env.AIHOT_FEATURED_FEED_URL || 'https://aihot.virxact.com/feed.xml';
+const MAX_NEWS_ITEMS = Number(process.env.MAX_NEWS_ITEMS) || 10;
+
+const parser = new Parser({
+  timeout: 10000,
+  headers: {
+    'User-Agent': 'PMTOOLS news-service/1.0 (+https://pmtools.com.cn)',
+  },
+});
+
+function cleanText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
 
 async function fetchSummary(url) {
   try {
@@ -62,6 +74,7 @@ async function fetch36kr() {
           summary = await generateSummary(item.title);
         }
         return {
+          id: item.guid || item.link || item.title || '',
           title: item.title || '',
           summary: summary || (item.contentSnippet || '').slice(0, 50),
           source: '36kr',
@@ -77,122 +90,34 @@ async function fetch36kr() {
   }
 }
 
-async function fetchAIBase() {
-  try {
-    const feed = await parser.parseURL(`${RSSHUB_BASE}/aibase/daily`);
-    const items = feed.items.slice(0, 10);
+function normalizeAIHotSource(author) {
+  const text = cleanText(author);
+  const match = text.match(/^[^(]*\((.*)\)$/);
+  return match ? match[1] : text || 'AI HOT';
+}
 
-    return await Promise.all(
-      items.map(async (item) => {
-        const title = (item.title || '').replace(/^AI日报[：:]\s*/, '');
-        let summary = (item.contentSnippet || '').slice(0, 80);
-        if (!summary || summary.length < 10) {
-          summary = await generateSummary(title);
-        }
-        return {
-          title,
-          summary,
-          source: 'AIBase',
-          category: 'AI',
-          publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
-          url: item.link || '',
-        };
-      })
-    );
+function normalizeAIHotItem(item) {
+  const title = cleanText(item.title);
+  const summary = cleanText(item.contentSnippet || item.content || item.description);
+  const url = item.link || item.guid || '';
+
+  return {
+    id: item.guid || url || title,
+    title,
+    summary,
+    source: normalizeAIHotSource(item.author || item.creator),
+    category: 'AI',
+    publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
+    url,
+  };
+}
+
+async function fetchAIHotFeatured() {
+  try {
+    const feed = await parser.parseURL(AIHOT_FEATURED_FEED_URL);
+    return feed.items.slice(0, 20).map(normalizeAIHotItem);
   } catch (err) {
-    console.error('[fetcher] AIBase 抓取失败:', err.message);
-    return [];
-  }
-}
-
-const AI_KEYWORDS = /\b(ai|artificial.intelligence|llm|gpt|openai|anthropic|claude|gemini|deepseek|machine.learning|deep.learning|neural|transformer|diffusion|stable.diffusion|midjourney|copilot|chatbot|model|推理|大模型|人工智能)\b/i;
-
-function isAIRelated(title) {
-  return AI_KEYWORDS.test(title);
-}
-
-async function translateToChinese(text) {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  const baseUrl = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
-  const model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
-
-  if (!apiKey) return text;
-
-  try {
-    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{
-          role: 'user',
-          content: `将以下英文翻译成中文，直接输出翻译结果：${text}`,
-        }],
-        max_tokens: 100,
-        temperature: 0.3,
-      }),
-      signal: AbortSignal.timeout(60000),
-    });
-
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() || text;
-  } catch {
-    return text;
-  }
-}
-
-async function fetchHackerNews() {
-  try {
-    const feed = await parser.parseURL(`${RSSHUB_BASE}/hackernews`);
-    const aiItems = feed.items.filter((item) => isAIRelated(item.title)).slice(0, 5);
-
-    return await Promise.all(
-      aiItems.map(async (item) => {
-        const originalTitle = item.title || '';
-        const title = await translateToChinese(originalTitle);
-        const summary = await generateSummary(title);
-        return {
-          title,
-          summary: summary || (item.contentSnippet || '').slice(0, 50),
-          source: 'Hacker News',
-          category: 'AI',
-          publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
-          url: item.link || '',
-        };
-      })
-    );
-  } catch (err) {
-    console.error('[fetcher] Hacker News 抓取失败:', err.message);
-    return [];
-  }
-}
-
-async function fetchSspai() {
-  try {
-    const feed = await parser.parseURL(`${RSSHUB_BASE}/sspai/tag/AI`);
-    const items = feed.items.slice(0, 5);
-
-    return await Promise.all(
-      items.map(async (item) => {
-        let summary = (item.contentSnippet || '').slice(0, 80);
-        if (!summary || summary.length < 10) {
-          summary = await generateSummary(item.title);
-        }
-        return {
-          title: item.title || '',
-          summary,
-          source: '少数派',
-          category: 'AI',
-          publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
-          url: item.link || '',
-        };
-      })
-    );
-  } catch (err) {
-    console.error('[fetcher] 少数派 抓取失败:', err.message);
+    console.error('[fetcher] AI HOT 精选抓取失败:', err.message);
     return [];
   }
 }
@@ -200,24 +125,23 @@ async function fetchSspai() {
 function dedup(items) {
   const seen = new Set();
   return items.filter((item) => {
-    const key = item.title.trim();
-    if (seen.has(key)) return false;
+    const key = cleanText(item.url || item.title);
+    if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
   });
 }
 
 async function fetchNews() {
-  const [news36kr, newsAIBase, newsHN, newsSspai] = await Promise.all([
+  const [news36kr, newsAIHot] = await Promise.all([
     fetch36kr(),
-    fetchAIBase(),
-    fetchHackerNews(),
-    fetchSspai(),
+    fetchAIHotFeatured(),
   ]);
 
-  return dedup([...news36kr, ...newsAIBase, ...newsHN, ...newsSspai])
+  return dedup([...news36kr, ...newsAIHot])
+    .filter((item) => item.title && item.url)
     .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
-    .slice(0, 10);
+    .slice(0, MAX_NEWS_ITEMS);
 }
 
 module.exports = { fetchNews };
